@@ -505,16 +505,51 @@
 
 ### 신규 OS 도구 (New OS Tools)
 
-- [ ] `screen.ocr` — 화면 캡처 영역에서 OCR 텍스트 추출 (Tesseract 또는 `leptonica` 바인딩)
+- [ ] `screen.ocr` — 화면 캡처 영역에서 OCR 텍스트 추출 (크로스 플랫폼 OCR)
 - [ ] `system.notify` — `notify-rust`를 통한 데스크톱 알림 (macOS, Linux)
 - [ ] `system.clipboard` — 시스템 클립보드 읽기/쓰기
 
-### MCP 통합 (MCP Integration)
+#### 참고: Screen OCR 오픈소스
 
-- [ ] MCP (Model Context Protocol) 클라이언트 — MCP 호환 도구 서버와 openpista 연결
-- [ ] MCP 도구 검색 및 `ToolRegistry`에 동적 등록
-- [ ] MCP 리소스 및 프롬프트 지원
-- [ ] 설정: `config.toml`의 `[mcp]` 섹션에 서버 URL 구성
+> **크로스 플랫폼 OCR**
+>
+> | 프로젝트 | 설명 |
+> |---------|------|
+> | [`uni-ocr`](https://github.com/screenpipe/uniOCR) | 범용 OCR 엔진 — Apple Vision (macOS), Windows OCR API, Tesseract (Linux). screenpipe 제작. |
+> | [`ocrs`](https://github.com/robertknight/ocrs) (~1,600 stars) | 순수 Rust OCR — RTen 엔진 기반 신경망 모델. 네이티브 의존성 없음. 라틴 문자 한정. |
+> | [`pure-onnx-ocr`](https://github.com/siska-tech/pure-onnx-ocr) | `tract`를 이용한 순수 Rust PaddleOCR 재구현. 다국어 지원, C/C++ 의존성 없음. |
+>
+> **Tesseract 바인딩**
+>
+> | 프로젝트 | 설명 |
+> |---------|------|
+> | [`leptess`](https://github.com/houqp/leptess) (~268 stars) | Leptonica + Tesseract 성숙한 Rust 바인딩. 시스템 Tesseract 필요. |
+> | [`tesseract-rs`](https://github.com/cafercangundogdu/tesseract-rs) | Tesseract 번들 포함 — 빌드 시 자동 다운로드 및 컴파일. 시스템 의존성 없음. |
+> | [`rusty-tesseract`](https://github.com/thomasgruebl/rusty-tesseract) | CLI 래퍼 — `tesseract` 바이너리 직접 호출. 가장 단순한 통합 방식. |
+>
+> **플랫폼 네이티브 OCR**
+>
+> | 프로젝트 | 설명 |
+> |---------|------|
+> | [`objc2-vision`](https://crates.io/crates/objc2-vision) | Apple Vision 프레임워크 바인딩 — macOS 최고 품질 OCR을 위한 `VNRecognizeTextRequest`. |
+> | [`macocr`](https://github.com/riddleling/macocr) | Rust에서 Apple Vision OCR 호출을 위한 CLI 참고 구현. |
+> | [Windows `Media::Ocr`](https://microsoft.github.io/windows-docs-rs/doc/windows/Media/Ocr/) | `windows` 크레이트를 통한 Windows 네이티브 OCR. |
+>
+> **Screen OCR 참고 프로젝트**
+>
+> | 프로젝트 | 설명 |
+> |---------|------|
+> | [`screenpipe`](https://github.com/screenpipe/screenpipe) (~16,900 stars) | Rust 앱 — `uni-ocr`를 통한 24/7 화면 녹화 + OCR. 최고의 참고 아키텍처. |
+> | [`oar-ocr`](https://github.com/GreatV/oar-ocr) | ONNX Runtime(`ort`)을 통한 PaddleOCR 모델. 다국어, GPU 선택적 지원. |
+
+### Web UI 도구 실행 표시 (Web UI Tool Execution Display)
+
+- [ ] `ToolCallStarted` / `ToolCallCompleted` WebSocket 메시지 쌍 — 실시간 도구 실행 이벤트
+- [ ] 채팅 내 인라인 도구 실행 카드: 도구 이름, 인자(접기/펼치기), 실행 상태 (스피너 → 결과)
+- [ ] 도구 출력 렌더링: 텍스트 출력, 종료 코드, 오류 강조 표시
+- [ ] `screen.capture` / `browser.screenshot` 결과를 인라인 이미지로 렌더링
+- [ ] 에이전트 턴별 도구 호출 기록 접기/펼치기 (전체 접기/펼치기)
+- [ ] 도구 실행 시간 표시 (duration 배지)
 
 ### 플러그인 시스템 (Plugin System)
 
@@ -548,6 +583,110 @@
  [ ] 워커 상태 WebSocket 피드 — 활성 컨테이너 실행에 대한 실시간 진행 상황을 TUI/Web UI에 푸시
  [ ] 워커 실행 이력 API — REST 엔드포인트 또는 TUI `/worker` 명령어를 통한 과거 워커 보고 조회
  [ ] TUI 워커 대시보드 — 활성/완료/실패 워커 실행 현황과 로그를 표시하는 전용 화면
+
+---
+
+## v0.3.0 — MCP 통합 (MCP Integration)
+
+MCP(Model Context Protocol)를 통해 외부 도구 서버와 연결하여 에이전트의 도구 표면을 동적으로 확장합니다.
+
+### MCP 통합 (Model Context Protocol)
+
+> SDK: [rmcp](https://github.com/modelcontextprotocol/rust-sdk) — 공식 Rust MCP SDK
+> 스펙: [MCP 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/)
+
+#### Phase 1: MCP Client Core (클라이언트 코어)
+
+- [ ] `crates/mcp/` 크레이트 생성 (`rmcp` 의존성 추가)
+- [ ] `McpClient` 구조체 — 단일 서버 stateful 연결
+- [ ] stdio 트랜스포트 (`TokioChildProcess`)
+- [ ] SSE 트랜스포트 (`SseClientTransport`)
+- [ ] Capability negotiation
+- [ ] 연결 lifecycle 관리 (connect → initialize → ready → shutdown)
+- [ ] 유닛 테스트 (mock MCP 서버)
+
+#### Phase 2: Tool Integration (도구 통합)
+
+- [ ] `McpToolBridge` — MCP 도구를 래핑하는 `Tool` 트레잇 구현
+- [ ] `McpManager` — 다중 서버 매니저
+- [ ] `ToolRegistry` 동적 등록 확장
+- [ ] `build_runtime()` 통합 (`main.rs`)
+- [ ] 도구 이름 충돌 처리 (`mcp__{server}__{tool}` 네이밍)
+- [ ] 스키마 변환 테스트
+
+#### Phase 3: Resources & Prompts
+
+- [ ] Resources 조회 및 읽기
+- [ ] 리소스 → 시스템 프롬프트 주입
+- [ ] 리소스 구독 (notifications)
+- [ ] Prompts 조회 및 렌더링
+- [ ] 프롬프트 → 에이전트 메시지 주입
+- [ ] 테스트
+
+#### Phase 4: Configuration & UX (설정 및 UX)
+
+- [ ] `config.toml`의 `[mcp]` 섹션 (`[[mcp.servers]]` 배열)
+- [ ] 환경 변수 오버라이드
+- [ ] TUI 상태바 `mcp_count` 연동 (`app.rs`)
+- [ ] `/mcp` TUI 슬래시 명령어
+- [ ] `openpista mcp list` CLI 서브커맨드
+- [ ] Web UI MCP 상태 표시
+
+#### Phase 5: Advanced (고급 기능)
+
+- [ ] 자동 재연결 (지수 백오프)
+- [ ] Sampling 지원
+- [ ] Elicitation 지원
+- [ ] Roots 지원
+- [ ] 도구 변경 알림 (`tools/list_changed`)
+- [ ] 다중 서버 도구 격리
+- [ ] 보안: 도구 실행 승인
+- [ ] 보안: 서버 프로세스 격리
+- [ ] 보안: SSE 인증
+- [ ] 성능: 연결 풀링
+- [ ] 통합 테스트 (E2E)
+
+#### 구현 순서 (Implementation Order)
+
+```
+Phase 1 → Phase 2 + Phase 4 (병렬) → Phase 3 → Phase 5
+```
+
+#### 참고 오픈소스 (Reference Open-Source Projects)
+
+> **MCP Rust SDK**
+>
+> | 프로젝트 | 설명 |
+> |----------|------|
+> | [`rmcp`](https://github.com/modelcontextprotocol/rust-sdk) | 공식 Rust MCP SDK — `McpClient`, `McpServer`, stdio/SSE 트랜스포트, 타입 지정 도구 스키마. 핵심 의존성. |
+> | [`rust-mcp-sdk`](https://github.com/rust-mcp-stack/rust-mcp-sdk) | 고수준 추상화를 갖춘 커뮤니티 Rust MCP SDK. |
+> | [`mcp_client_rs`](https://github.com/terhechte/mcp_client_rs) | Rust용 경량 MCP 클라이언트 라이브러리. |
+>
+> **MCP를 사용하는 AI 에이전트 및 IDE**
+>
+> | 프로젝트 | 설명 |
+> |----------|------|
+> | [`Goose`](https://github.com/block/goose) | Block의 오픈소스 AI 에이전트 — 다중 서버 관리 및 도구 브릿징 참고용. |
+> | [`OpenCode`](https://github.com/sst/opencode) | MCP 클라이언트를 지원하는 터미널 AI 에이전트 — openpista와 가장 유사한 아키텍처. |
+> | [`Zed`](https://github.com/zed-industries/zed) | Rust 편집기 — SSE 트랜스포트 및 capability negotiation 참고용. |
+> | [`Claude Code`](https://github.com/anthropics/claude-code) | Anthropic CLI — MCP 서버 지원의 권위 있는 참고 구현체. |
+> | [`Cursor`](https://github.com/getcursor/cursor) | MCP 클라이언트를 갖춘 IDE — 도구 승인 UI 및 다중 서버 설정 참고용. |
+> | [`Continue`](https://github.com/continuedev/continue) | MCP 클라이언트를 갖춘 AI 코딩 보조 도구 — MCP 도구 브릿징 패턴 참고용. |
+> | [`Cline`](https://github.com/cline/cline) | MCP 클라이언트를 갖춘 VS Code AI 에이전트 — 동적 도구 등록 및 리소스 주입 참고용. |
+>
+> **프로토콜 스펙 (Protocol Specification)**
+>
+> | 리소스 | 설명 |
+> |--------|------|
+> | [MCP Specification 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/) | 권위 있는 프로토콜 스펙 — 트랜스포트, 생명주기, 도구, 리소스, 프롬프트, 샘플링. |
+>
+> **MCP 서버 예제**
+>
+> | 프로젝트 | 설명 |
+> |----------|------|
+> | [`mcp-server-git`](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | 공식 Git MCP 서버 — 도구 스키마 설계 및 stdio 트랜스포트 패턴 참고용. |
+> | [`mcp-server-filesystem`](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) | 공식 파일시스템 MCP 서버 — 리소스 조회 및 읽기 참고용. |
+> | [`awesome-mcp-servers`](https://github.com/punkpeye/awesome-mcp-servers) | MCP 서버 큐레이션 목록 — 통합 테스트 대상. |
 
 ---
 

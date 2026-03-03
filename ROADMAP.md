@@ -506,27 +506,161 @@ Baseline (config expansion → send_chunked → typing indicator)
 
 ---
 
-## v0.2.0 — Screen & Browser
+## v0.2.0 — Platform Integrations & Observability
 
-Extends the tool surface to visual OS control.
+Extends the channel surface and adds production observability.
 
-- `screen.capture` — base64/file screenshot via `screenshots` crate
-- `screen.ocr` — text extraction from screen regions
-- `browser.navigate` — Chromium CDP via `chromiumoxide`
-- `browser.click`, `browser.type`, `browser.screenshot`
-- `system.notify` — desktop notifications via `notify-rust`
-- Discord adapter
-- Slack adapter
-- Prometheus metrics export (`metrics-exporter-prometheus`)
+### New OS Tools
+
+- [x] `screen.capture` — base64/file screenshot via `screenshots` crate *(completed in v0.1.0)*
+- [x] `browser.navigate`, `browser.click`, `browser.type`, `browser.screenshot` — Chromium CDP via `chromiumoxide` *(completed in v0.1.0)*
+- [ ] `screen.ocr` — text extraction from screen regions (cross-platform OCR)
+- [ ] `system.notify` — desktop notifications via `notify-rust` (macOS, Linux)
+- [ ] `system.clipboard` — system clipboard read/write
+
+#### Reference: Screen OCR
+
+> **Cross-Platform OCR**
+>
+> | Project | Description |
+> |---------|-------------|
+> | [`uni-ocr`](https://github.com/screenpipe/uniOCR) | Universal OCR engine — Apple Vision (macOS), Windows OCR API, Tesseract (Linux). From screenpipe. |
+> | [`ocrs`](https://github.com/robertknight/ocrs) (~1,600 stars) | Pure Rust OCR — neural net models via RTen engine. Zero native deps. Latin only. |
+> | [`pure-onnx-ocr`](https://github.com/siska-tech/pure-onnx-ocr) | Pure Rust PaddleOCR reimplementation via `tract`. Multi-language, zero C/C++ deps. |
+>
+> **Tesseract Bindings**
+>
+> | Project | Description |
+> |---------|-------------|
+> | [`leptess`](https://github.com/houqp/leptess) (~268 stars) | Mature Rust bindings for Leptonica + Tesseract. Requires system Tesseract. |
+> | [`tesseract-rs`](https://github.com/cafercangundogdu/tesseract-rs) | Vendored Tesseract — auto-downloads and compiles at build time. No system dep. |
+> | [`rusty-tesseract`](https://github.com/thomasgruebl/rusty-tesseract) | CLI wrapper — shells out to `tesseract` binary. Simplest integration. |
+>
+> **Platform-Native OCR**
+>
+> | Project | Description |
+> |---------|-------------|
+> | [`objc2-vision`](https://crates.io/crates/objc2-vision) | Apple Vision framework bindings — `VNRecognizeTextRequest` for best macOS OCR. |
+> | [`macocr`](https://github.com/riddleling/macocr) | CLI reference for calling Apple Vision OCR from Rust. |
+> | [Windows `Media::Ocr`](https://microsoft.github.io/windows-docs-rs/doc/windows/Media/Ocr/) | Native Windows OCR via `windows` crate. |
+>
+> **Screen OCR Reference**
+>
+> | Project | Description |
+> |---------|-------------|
+> | [`screenpipe`](https://github.com/screenpipe/screenpipe) (~16,900 stars) | Rust app — 24/7 screen recording + OCR via `uni-ocr`. Best reference architecture. |
+> | [`oar-ocr`](https://github.com/GreatV/oar-ocr) | PaddleOCR models via ONNX Runtime (`ort`). Multi-language, GPU optional. |
+
+### Web UI Tool Execution Display
+
+- [ ] `ToolCallStarted` / `ToolCallCompleted` WebSocket message pair — real-time tool execution events
+- [ ] Inline tool execution card in chat: tool name, arguments (collapsible), execution status (spinner → result)
+- [ ] Tool output rendering: text output, exit codes, error highlighting
+- [ ] `screen.capture` / `browser.screenshot` results rendered as inline images
+- [ ] Collapsible tool call history per agent turn (expand/collapse all tool calls)
+- [ ] Tool execution timing display (duration badge)
 
 ---
 
-## v0.3.0 — Voice & Multi-Agent
+## v0.3.0 — MCP & Multi-Agent
 
-- [ ] MCP (Model Context Protocol) client — connect openpista to any MCP-compatible tool server
-- [ ] MCP tool discovery and dynamic registration into `ToolRegistry`
-- [ ] MCP resource and prompt support
-- [ ] Configuration: `[mcp]` section in `config.toml` with server URLs
+### MCP Integration (Model Context Protocol)
+
+> SDK: [rmcp](https://github.com/modelcontextprotocol/rust-sdk) — official Rust MCP SDK
+> Spec: [MCP 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/)
+
+#### Phase 1: MCP Client Core
+
+- [ ] Create `crates/mcp/` crate with `rmcp` dependency
+- [ ] `McpClient` struct — stateful single-server connection
+- [ ] stdio transport (`TokioChildProcess`)
+- [ ] SSE transport (`SseClientTransport`)
+- [ ] Capability negotiation
+- [ ] Connection lifecycle management (connect → initialize → ready → shutdown)
+- [ ] Unit tests (mock MCP server)
+
+#### Phase 2: Tool Integration
+
+- [ ] `McpToolBridge` — implements `Tool` trait to wrap MCP tools
+- [ ] `McpManager` — multi-server manager
+- [ ] `ToolRegistry` dynamic registration extension
+- [ ] `build_runtime()` integration (`main.rs`)
+- [ ] Tool name collision handling (`mcp__{server}__{tool}` naming)
+- [ ] Schema conversion tests
+
+#### Phase 3: Resources & Prompts
+
+- [ ] Resource listing and reading
+- [ ] Resource → system prompt injection
+- [ ] Resource subscriptions (notifications)
+- [ ] Prompt listing and rendering
+- [ ] Prompt → agent message injection
+- [ ] Tests
+
+#### Phase 4: Configuration & UX
+
+- [ ] `[mcp]` section in `config.toml` (`[[mcp.servers]]` array)
+- [ ] Environment variable overrides
+- [ ] TUI status bar `mcp_count` integration (`app.rs`)
+- [ ] `/mcp` TUI slash command
+- [ ] `openpista mcp list` CLI subcommand
+- [ ] Web UI MCP status display
+
+#### Phase 5: Advanced
+
+- [ ] Auto-reconnect with exponential backoff
+- [ ] Sampling support
+- [ ] Elicitation support
+- [ ] Roots support
+- [ ] Tool change notifications (`tools/list_changed`)
+- [ ] Multi-server tool isolation
+- [ ] Security: tool execution approval
+- [ ] Security: server process isolation
+- [ ] Security: SSE authentication
+- [ ] Performance: connection pooling
+- [ ] Integration tests (E2E)
+
+#### Implementation Order
+
+```
+Phase 1 → Phase 2 + Phase 4 (parallel) → Phase 3 → Phase 5
+```
+
+#### Reference Open-Source Projects
+
+> **MCP Rust SDKs**
+>
+> | Project | Description |
+> |---------|-------------|
+> | [`rmcp`](https://github.com/modelcontextprotocol/rust-sdk) | Official Rust MCP SDK — `McpClient`, `McpServer`, stdio/SSE transports, typed tool schemas. Primary dependency. |
+> | [`rust-mcp-sdk`](https://github.com/rust-mcp-stack/rust-mcp-sdk) | Community Rust MCP SDK with higher-level abstractions. |
+> | [`mcp_client_rs`](https://github.com/terhechte/mcp_client_rs) | Lightweight MCP client library for Rust. |
+>
+> **AI Agents & IDEs with MCP**
+>
+> | Project | Description |
+> |---------|-------------|
+> | [`Goose`](https://github.com/block/goose) | Block's open-source AI agent with MCP client — reference for multi-server management and tool bridging. |
+> | [`OpenCode`](https://github.com/sst/opencode) | Terminal AI agent with MCP client support — closest architecture match (CLI + MCP). |
+> | [`Zed`](https://github.com/zed-industries/zed) | Rust editor with MCP context server integration — reference for SSE transport and capability negotiation. |
+> | [`Claude Code`](https://github.com/anthropics/claude-code) | Anthropic's CLI with MCP server support — authoritative reference implementation. |
+> | [`Cursor`](https://github.com/getcursor/cursor) | IDE with MCP client — reference for tool approval UI and multi-server config. |
+> | [`Continue`](https://github.com/continuedev/continue) | Open-source AI coding assistant with MCP client — reference for MCP tool bridging patterns. |
+> | [`Cline`](https://github.com/cline/cline) | VS Code AI agent with MCP client — reference for dynamic tool registration and resource injection. |
+>
+> **Protocol Specification**
+>
+> | Resource | Description |
+> |----------|-------------|
+> | [MCP Specification 2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/) | Authoritative protocol spec — transport layer, lifecycle, tools, resources, prompts, sampling. |
+>
+> **MCP Server Examples**
+>
+> | Project | Description |
+> |---------|-------------|
+> | [`mcp-server-git`](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | Official Git MCP server — reference for tool schema design and stdio transport patterns. |
+> | [`mcp-server-filesystem`](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) | Official filesystem MCP server — reference for resource listing and reading. |
+> | [`awesome-mcp-servers`](https://github.com/punkpeye/awesome-mcp-servers) | Curated list of MCP servers — test targets for integration testing. |
 
 ### Plugin System
 
