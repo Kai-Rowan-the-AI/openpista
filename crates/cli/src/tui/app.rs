@@ -3,6 +3,47 @@
 use unicode_width::UnicodeWidthStr;
 
 use super::theme::THEME;
+
+/// Maximum length for tool output preview before truncation.
+const MAX_OUTPUT_PREVIEW_LEN: usize = 120;
+
+/// Detects if the output contains image data (JSON with mime type and base64 data).
+/// Returns a formatted placeholder if images are detected, or the original output
+/// truncated to MAX_OUTPUT_PREVIEW_LEN.
+fn format_tool_output(output: &str) -> String {
+    // Try to parse as JSON to detect image data
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(output) {
+        // Check for single image object
+        if let Some(mime) = json.get("mime").and_then(|m| m.as_str()) {
+            if mime.starts_with("image/") && json.get("data_b64").is_some() {
+                return "[image]".to_string();
+            }
+        }
+        // Check for array of images
+        if let Some(arr) = json.as_array() {
+            let image_count = arr
+                .iter()
+                .filter(|item| {
+                    item.get("mime")
+                        .and_then(|m| m.as_str())
+                        .map(|m| m.starts_with("image/"))
+                        .unwrap_or(false)
+                        && item.get("data_b64").is_some()
+                })
+                .count();
+            if image_count > 0 {
+                return format!("[{} image(s)]", image_count);
+            }
+        }
+    }
+
+    // No image data detected, apply normal truncation
+    if output.len() > MAX_OUTPUT_PREVIEW_LEN {
+        format!("{}…", &output[..MAX_OUTPUT_PREVIEW_LEN])
+    } else {
+        output.to_string()
+    }
+}
 use crate::auth_picker::{self, AuthLoginIntent, AuthMethodChoice, LoginBrowseStep};
 use crate::config::LoginAuthMode;
 use crate::model_catalog;
@@ -997,11 +1038,7 @@ impl TuiApp {
                         break;
                     }
                 }
-                let preview = if output.len() > 120 {
-                    format!("{}…", &output[..120])
-                } else {
-                    output
-                };
+                let preview = format_tool_output(&output);
                 self.messages.push(TuiMessage::ToolResult {
                     tool_name,
                     output_preview: preview,
@@ -1126,9 +1163,10 @@ impl TuiApp {
                     }
                 }
                 proto::Role::Tool => {
+                    let preview = format_tool_output(&msg.content);
                     self.messages.push(TuiMessage::ToolResult {
                         tool_name: msg.tool_name.unwrap_or_default(),
-                        output_preview: msg.content,
+                        output_preview: preview,
                         is_error: false,
                     });
                 }
