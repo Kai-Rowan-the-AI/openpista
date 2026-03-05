@@ -7448,4 +7448,60 @@ mod tests {
             Action::TextSelectionDrag { row: 21, col: 77 }
         ));
     }
+
+    // ── Image placeholder detection tests ─────────────────
+
+    #[test]
+    fn detect_image_placeholder_json_mime_png() {
+        let input = r#"{"mime":"image/png","data_b64":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}"#;
+        assert_eq!(detect_image_placeholder(input), Some("[image:png]".to_string()));
+    }
+
+    #[test]
+    fn detect_image_placeholder_json_mime_jpeg() {
+        let input = r#"{"mime":"image/jpeg","data_b64":"/9j/4AAQSkZJRgABAQEASABIAAD"}"#;
+        assert_eq!(detect_image_placeholder(input), Some("[image:jpeg]".to_string()));
+    }
+
+    #[test]
+    fn detect_image_placeholder_json_image_field() {
+        let input = r#"{"image":"some-data-here"}"#;
+        assert_eq!(detect_image_placeholder(input), Some("[image]".to_string()));
+    }
+
+    #[test]
+    fn detect_image_placeholder_json_img_field() {
+        let input = r#"{"img":"some-data-here"}"#;
+        assert_eq!(detect_image_placeholder(input), Some("[image]".to_string()));
+    }
+
+    #[test]
+    fn detect_image_placeholder_data_uri() {
+        let input = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        assert_eq!(detect_image_placeholder(input), Some("[image:png]".to_string()));
+    }
+
+    #[test]
+    fn detect_image_placeholder_data_uri_jpeg() {
+        let input = "Here is an image: data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD";
+        assert_eq!(detect_image_placeholder(input), Some("[image:jpeg]".to_string()));
+    }
+
+    #[test]
+    fn detect_image_placeholder_no_image() {
+        let input = r#"{"result":"some text output"}"#;
+        assert_eq!(detect_image_placeholder(input), None);
+    }
+
+    #[test]
+    fn detect_image_placeholder_plain_text() {
+        let input = "This is just plain text with no image data";
+        assert_eq!(detect_image_placeholder(input), None);
+    }
+
+    #[test]
+    fn detect_image_placeholder_json_no_data_b64() {
+        let input = r#"{"mime":"image/png","url":"http://example.com/image.png"}"#;
+        assert_eq!(detect_image_placeholder(input), Some("[image:png]".to_string()));
+    }
 }
